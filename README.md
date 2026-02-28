@@ -1,189 +1,75 @@
-# Doküman
+# WhatsApp -> Qwen Dataset (Minimal)
 
-## LLM-Assisted Rewrite Guardrails
+Kanka en kısa haliyle: bu proje **terminalden** çalışıyor.
 
-Bu bölüm, LLM destekli metin yeniden yazım süreçlerinde güvenlik, izlenebilirlik ve kalite güvencesi gereksinimlerini tanımlar.
+## 1) Gerekenler
+- Python 3.9+
+- WhatsApp dışa aktarma `.txt` dosyası
 
-### 1) İzinli Dönüşümler
-Aşağıdaki dönüşümler **izinlidir**:
-
-- İmla, noktalama ve tipografi düzeltmeleri.
-- Gereksiz tekrarların temizlenmesi (anlamı koruyarak sadeleştirme).
-- Dil bilgisi iyileştirmeleri (zaman/kişi uyumu, cümle akışı).
-- Biçimsel standardizasyon (başlık/cümle biçimi, liste formatı).
-- Anlamı değiştirmeyen netlik artırımı (belirsizliği azaltan küçük düzenlemeler).
-
-### 2) Yasak Dönüşümler
-Aşağıdaki dönüşümler **yasaktır**:
-
-- Kaynak metinde bulunmayan anlam veya bilgi eklemek.
-- Olay, tarih, kişi, alıntı veya veri uydurmak.
-- Yazarın niyetini, tonunu veya hükmünü değiştirmek.
-- Kapsamı genişletmek veya daraltmak (orijinal sınırların dışına çıkmak).
-- Kesinlik düzeyini değiştirmek (olasılığı kesin ifade etmek veya tersini yapmak).
-
-### 3) Diff Saklama Zorunluluğu
-Her dönüşüm için diff kaydı tutulması zorunludur:
-
-- Her yeniden yazım çıktısı için satır bazlı `before/after` diff saklanır.
-- Diff kaydı; içerik kimliği, zaman damgası, model sürümü ve işlem kimliği ile birlikte arşivlenir.
-- Diff kayıtları denetim amacıyla geri çağrılabilir ve en az 180 gün saklanır.
-- Diff kaydı olmayan dönüşümler geçersiz sayılır ve yayına alınmaz.
-
-### 4) Yüksek Etkili Değişikliklerde İnsan Onayı
-Yüksek etkili değişikliklerde `human_review_required` koşulu zorunludur.
-
-`human_review_required = true` tetikleme koşulları:
-
-- Politika, hukuk, finans, güvenlik veya kamuya açık resmi beyan içeren metinlerde anlamı etkileyen düzenlemeler.
-- Sayısal değer, tarih, kişi/kurum adı veya yükümlülük ifadesi içeren değişiklikler.
-- Orijinal metnin iddia düzeyini, riski veya sorumluluk kapsamını etkileyen düzenlemeler.
-- Otomatik kalite kontrollerinden herhangi birini geçemeyen dönüşümler.
-
-Onay akışı:
-
-1. LLM çıktısı ve diff kaydı incelemeye alınır.
-2. Yetkili insan gözden geçiren onaylar veya reddeder.
-3. Onay sonucu ve gerekçesi audit kaydına eklenir.
-
-### 5) Rastgele Örneklemle Manuel Kalite Denetimi
-Süreç kalitesi için periyodik manuel denetim uygulanır:
-
-1. Her üretim döneminde (ör. günlük/haftalık) dönüşümlerin en az %5'i rastgele örneklenir.
-2. Örneklem, farklı içerik türleri ve risk sınıflarını temsil edecek şekilde tabakalı rastgele seçilir.
-3. Denetçiler şu kontrol listesini uygular:
-   - Anlam korunumu
-   - Yasak dönüşüm ihlali var/yok
-   - Dil kalitesi ve okunabilirlik
-   - Diff ve meta-kayıt bütünlüğü
-4. Hata oranı eşik değeri aşarsa düzeltici aksiyon açılır ve ilgili model/prompt sürümü askıya alınır.
-5. Denetim sonuçları aylık raporlanır; bulgular, politika güncelleme girdisi olarak kullanılır.
-# Dokümantasyon
-
-## Tokenization & Truncation Policy
-
-### 1) Hedef tokenizer/model ailesi
-- Bu dokümanda hedef model ailesi **Qwen2.5** olarak kabul edilir.
-- Token hesaplaması, kullanılan Qwen sürümünün kendi tokenizer'ı ile yapılmalıdır (örn. Qwen2.5 tokenizer).
-
-### 2) Token limitleri
-- **Maksimum context token:** `131072`
-- **Maksimum output token:** `8192`
-
-> Not: Farklı bir Qwen sürümüne geçilirse bu değerler, ilgili sürümün resmi limitleriyle güncellenmelidir.
-
-### 3) Aşım durumunda truncation sırası
-Context sınırı aşıldığında aşağıdaki sıra **zorunlu** olarak uygulanır:
-1. **En eski geçmiş mesajlardan kesme** (FIFO mantığı).
-2. **System mesajını koru** (silme/kısaltma yapılmaz).
-3. **Hedef assistant cevabını asla kesme** (çıktı bütçesi önceden rezerve edilir).
-
-Uygulama notu:
-- Üretim öncesi, hedef assistant cevabı için `max_output_token` kadar alan ayrılır.
-- Geriye kalan bütçeye sığmayan geçmiş mesajlar, en eskiden başlayarak çıkarılır.
-
-### 4) Truncation işaretleme kuralı
-Truncation uygulanan her örnek aşağıdaki alanla işaretlenmelidir:
-- `truncated=true`
-
-Örnek:
-```json
-{
-  "messages": [...],
-  "truncated": true
-}
+Kontrol:
+```bash
+python --version
 ```
 
-### 5) Token istatistikleri (zorunlu raporlama)
-Her batch/çalıştırma için ortalama token istatistikleri raporlanması zorunludur:
-- Ortalama input token
-- Ortalama output token
-- Ortalama toplam token
-- Truncation oranı (`truncated=true` örnek yüzdesi)
+---
 
-Raporlama periyodu en az günlük olmalı ve model/sürüm bazında ayrı izlenmelidir.
-# Konuşma Dönüştürme Kılavuzu
+## 2) Windows'ta nasıl çalıştıracağım?
 
-## Role Mapping Policy
+### Adım adım
+1. Klasörü aç (senin ekrandaki gibi `Deneme-main`).
+2. O klasör içinde terminal aç:
+   - Adres çubuğuna `cmd` yazıp Enter (veya PowerShell aç).
+3. Şu komutu çalıştır:
 
-Aşağıdaki kurallar, ham konuşmacı etiketlerinden hedef model rollerine güvenli ve tutarlı bir eşleme yapmak için zorunludur.
+```bash
+python run_pipeline.py --input whatsapp.txt --assistant-speaker Ahmet
+```
 
-1. **"Ben" konuşmacısını sabitleme**
-   - `owner_name` veya `owner_phone` ile eşleşen satırlar her zaman **konuşma sahibi** olarak kabul edilir.
-   - Bu eşleşme sonrası aynı konuşmacı kimliği tüm kayıt boyunca tek bir role sabitlenir (oturum içinde role kayması yapılmaz).
+> `whatsapp.txt` yerine kendi dosya adını yaz.
+> `Ahmet` yerine modelin "assistant" gibi öğrenmesini istediğin kişiyi yaz.
 
-2. **Hedef modele göre `assistant` tarafını açık tanımlama**
-   - **Chat-style hedef modeller** için:
-     - Konuşma sahibi (`owner_*` ile eşleşen kişi) -> `user`
-     - Karşı taraf (tekil diğer katılımcı) -> `assistant`
-   - **Instruction-style / tek yönlü hedef modeller** için:
-     - Konuşma sahibi -> `assistant` (ajan/prompt yürüten taraf)
-     - Karşı taraf -> `user`
-   - Kullanılan model türü pipeline konfigürasyonunda açıkça belirtilmeli; varsayılan role-map buna göre seçilmelidir.
+Çıktılar `outputs/` klasörüne gelir:
+- `outputs/training.jsonl`
+- `outputs/report.json`
+- `outputs/report.csv`
 
-3. **Grup sohbeti dışlama / çok konuşmacı indirgeme**
-   - Ham kayıtta ikiden fazla farklı konuşmacı varsa kayıt **grup sohbeti** olarak işaretlenir.
-   - Politika:
-     - Varsayılan: grup sohbeti kayıtları dışlanır (`exclude_group_chat = true`).
-     - İzin verilirse: en yüksek mesaj hacmine sahip iki konuşmacı korunur, diğerleri `drop` edilir (çok konuşmacı indirgeme).
+---
 
-4. **Belirsiz konuşmacı satırları için `drop` etiketi**
-   - Konuşmacı bilgisi eksik, çelişkili veya kimlik eşleşmesi yapılamayan satırlar `drop` olarak etiketlenir.
-   - `drop` satırları eğitim/çıktı örneğine dahil edilmez; yalnızca kalite raporunda sayısal olarak izlenir.
+## 3) Tek tek çalıştırmak istersen
 
-5. **Örnek role-map tablosu**
+### 3.1 Eğitim verisi üret
+```bash
+python prepare_dataset.py --input whatsapp.txt --output training.jsonl --assistant-speaker Ahmet
+```
 
-| Ham konuşmacı (`raw_speaker`) | Eşleşme/Koşul | Nihai role |
-|---|---|---|
-| `Ahmet Y.` | `owner_name = Ahmet Y.` | `user` |
-| `+90 555 111 22 33` | `owner_phone = +90 555 111 22 33` | `user` |
-| `Müşteri Destek` | owner ile eşleşmiyor, tekil karşı taraf | `assistant` |
-| `Bilinmiyor` | kimlik çözümlenemedi | `drop` |
-| `Katılımcı-3` | grup sohbeti indirgemede ilk iki dışında kaldı | `drop` |
-# Veri Hazırlama Notları
+### 3.2 Kalite skorunu çıkar
+```bash
+python score_dataset.py --input training.jsonl --report-json report.json --report-csv report.csv
+```
 
-## Dataset Split Strategy
+---
 
-Bu bölüm, eğitim/doğrulama/test ayrımında veri sızıntısını azaltmak ve gerçekçi değerlendirme yapmak için uygulanacak split stratejisini tanımlar.
+## 4) Sık hata / çözüm
 
-### 1) Split birimi: `session_id`
-- Split işlemi mesaj satırı seviyesinde **değil**, `session_id` seviyesinde yapılmalıdır.
-- Aynı `session_id` altında bulunan tüm mesajlar tek bir gruptur ve yalnızca tek bir split'e atanır.
+### `python is not recognized`
+- Python kurulu değil veya PATH'e ekli değil.
+- Python'u tekrar kurarken **Add Python to PATH** işaretle.
 
-### 2) Grup bütünlüğü: aynı kişi/aynı sohbet korunumu
-- Aynı kullanıcıya (ör. `user_id`) ve aynı sohbete (`session_id`) ait örnekler farklı split'lere dağıtılmamalıdır.
-- Uygulamada split anahtarı en azından `session_id` olmalı; gerekiyorsa `user_id + session_id` birleşik anahtarı ile grup bütünlüğü garanti edilmelidir.
-- Doğrulama adımı olarak, split sonrası aynı anahtarın birden fazla split içinde geçip geçmediği kontrol edilir.
+### `No such file or directory: whatsapp.txt`
+- Dosya adı yanlış ya da terminal yanlış klasörde.
+- `dir` (Windows) veya `ls` (mac/Linux) ile dosya var mı kontrol et.
 
-### 3) Zaman bazlı split opsiyonu
-- Rastgele grup split'ine ek olarak zaman bazlı split seçeneği sunulmalıdır.
-- Önerilen yaklaşım:
-  - Eski dönem verileri: `train`
-  - Orta dönem verileri: `val`
-  - En güncel dönem verileri: `test`
-- Zaman bazlı split için `timestamp` (veya eşdeğer olay zamanı alanı) zorunludur.
-- Opsiyonel yapılandırma parametreleri:
-  - `split_mode`: `group_random` | `time_based`
-  - `time_cutoff_train`
-  - `time_cutoff_val`
+### `written_examples=0`
+- Dosya formatı WhatsApp export formatıyla eşleşmiyor olabilir.
+- `--assistant-speaker` adı dosyadaki konuşmacı adıyla birebir aynı olmalı.
 
-### 4) Split sonrası benzerlik kontrolü
-- Split tamamlandıktan sonra splitler arası yakın kopya/çok benzer örnek taraması yapılmalıdır.
-- Amaç: train ile val/test arasında neredeyse aynı içeriklerin bulunmasını tespit etmek.
-- Önerilen kontrol yöntemleri (en az biri):
-  - Metin hash + near-duplicate (MinHash/LSH)
-  - Embedding tabanlı kosinüs benzerliği eşiği
-  - Karakter/kelime n-gram Jaccard benzerliği
-- Tespit edilen örnekler için aksiyon politikası tanımlanmalıdır (örn. testten çıkar, train'den çıkar, manuel inceleme kuyruğuna al).
+---
 
-### 5) Split dağılım raporu (tablo formatı)
-Split sonrasında aşağıdaki standart tablo üretilmelidir:
+## 5) Örnek input formatı
 
-| Split | Session Count | Message Count | User Count | Time Range | Duplicate Alerts | Ratio (%) |
-|------:|--------------:|--------------:|-----------:|------------|-----------------:|----------:|
-| train |               |               |            |            |                  |           |
-| val   |               |               |            |            |                  |           |
-| test  |               |               |            |            |                  |           |
-| total |               |               |            |            |                  | 100.00    |
-
-> Not: `Ratio (%)` mesaj sayısı veya session sayısı bazında raporlanabilir; hangi metrik kullanıldıysa başlıkta açıkça belirtilmelidir.
+```text
+28/02/2026, 10:00 - Ben: Dün attığım rapora baktın mı?
+28/02/2026, 10:02 - Ahmet: Evet baktım, veri temizliği eksik.
+28/02/2026, 10:03 - Ben: Neyi ekleyelim?
+28/02/2026, 10:04 - Ahmet: Medya satırlarını atıp PII maskelemesi ekleyin.
+```
